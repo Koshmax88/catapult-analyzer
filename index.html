@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catapult Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root {
+    --g: #00ff88;
+    --r: #ff3366;
+    --bg: #07080a;
+    --card: #0d0f12;
+    --border: #181c22;
+    --muted: #353d4a;
+    --text: #dde6f0;
+    --sub: #7a8898;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 22px 0 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+
+  .logo-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--g);
+    box-shadow: 0 0 12px var(--g);
+    animation: pulse 2s ease infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 12px var(--g);} 50%{opacity:0.6;box-shadow:0 0 4px var(--g);} }
+
+  .logo-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--g);
+    text-transform: uppercase;
+  }
+
+  .version-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-label::before {
+    content: '';
+    display: inline-block;
+    width: 4px; height: 4px;
+    background: var(--g);
+    border-radius: 50%;
+  }
+
+  /* Waiting state */
+  #waiting {
+    text-align: center;
+    padding: 60px 24px;
+  }
+
+  .waiting-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+    display: block;
+    animation: float 3s ease infinite;
+  }
+
+  @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+
+  .waiting-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+
+  .waiting-sub {
+    font-size: 13px;
+    color: var(--sub);
+    line-height: 1.8;
+    margin-bottom: 28px;
+  }
+
+  .step-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+    max-width: 400px;
+    margin: 0 auto 28px;
+  }
+
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #0a0c0f;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--sub);
+  }
+
+  .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--g);
+    font-weight: 700;
+    min-width: 20px;
+    margin-top: 1px;
+  }
+
+  /* Manual input fallback */
+  .manual-form { display: none; }
+  .manual-form.show { display: block; }
+
+  .inp {
+    width: 100%;
+    background: #0a0c0f;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 10px 13px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+  .inp:focus { border-color: #00ff8866; }
+  .inp::placeholder { color: #252a32; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  .field-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  /* Token data display */
+  #token-card { display: none; }
+  #token-card.show { display: block; }
+
+  .token-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .token-avatar {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    object-fit: cover;
+    background: var(--border);
+  }
+
+  .token-name { font-size: 20px; font-weight: 700; }
+  .token-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--sub); margin-top: 3px; }
+
+  .speed-badge {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 6px;
+    background: rgba(0,255,136,0.1);
+    border: 1px solid rgba(0,255,136,0.3);
+    color: var(--g);
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .stat-box {
+    background: #0a0c0f;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .stat-value {
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  /* Result */
+  #result-card { display: none; }
+  #result-card.show { display: block; }
+
+  .verdict {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .direction {
+    font-size: 36px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .conf-wrap { flex: 1; min-width: 200px; }
+
+  .conf-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .conf-bar {
+    height: 6px;
+    background: #111418;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .conf-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1.2s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .conf-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  .signals { margin-bottom: 18px; }
+
+  .signal-item {
+    display: flex;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+    font-size: 13px;
+    color: #b0bdd0;
+    line-height: 1.5;
+  }
+
+  .signal-item:last-child { border-bottom: none; }
+
+  .signal-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+
+  .analysis-block {
+    background: #0a0c0f;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--sub);
+    line-height: 1.8;
+    margin-bottom: 12px;
+  }
+
+  .risk-block {
+    background: rgba(255,51,102,0.05);
+    border-left: 2px solid rgba(255,51,102,0.4);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #7a5060;
+    line-height: 1.8;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    width: 100%;
+    background: var(--g);
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    padding: 15px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:active { transform: scale(0.99); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-secondary {
+    width: 100%;
+    background: transparent;
+    color: var(--sub);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 13px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+
+  /* Spinner */
+  .spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid #1c2028;
+    border-top: 2px solid var(--g);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Loading overlay */
+  #loading { display: none; }
+  #loading.show {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px;
+    text-align: center;
+  }
+
+  .loading-ring {
+    width: 44px; height: 44px;
+    border: 3px solid var(--border);
+    border-top: 3px solid var(--g);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 18px;
+  }
+
+  .loading-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    animation: pulse 1.5s ease infinite;
+  }
+
+  .loading-sub { font-size: 11px; color: #252a32; margin-top: 6px; }
+
+  /* Pattern & Momentum buttons */
+  .pattern-btn, .momentum-btn {
+    background: #0a0c0f;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--sub);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 4px;
+    font-size: 18px;
+  }
+  .pattern-btn span {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .momentum-btn {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 10px 6px;
+    flex-direction: row;
+    gap: 6px;
+  }
+  .pattern-btn.active, .momentum-btn.active {
+    border-color: var(--g);
+    background: rgba(0,255,136,0.08);
+    color: var(--g);
+  }
+  .pattern-btn.active span { color: var(--g); }
+
+  /* Disclaimer */
+  .disclaimer {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #1e2228;
+    text-align: center;
+    line-height: 1.9;
+    margin-top: 8px;
+    letter-spacing: 0.04em;
+  }
+
+  /* Slide animation */
+  @keyframes slideIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+  .slide { animation: slideIn 0.3s ease; }
+
+  /* Textarea */
+  textarea.inp { resize: vertical; min-height: 70px; line-height: 1.7; }
+
+  select.inp { cursor: pointer; }
+
+  .mt { margin-top: 12px; }
+
+  /* Bookmarklet install section */
+  .bookmarklet-box {
+    background: rgba(0,255,136,0.04);
+    border: 1px solid rgba(0,255,136,0.15);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+
+  .bm-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--g);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+
+  .bm-link {
+    display: inline-block;
+    background: var(--g);
+    color: #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 7px;
+    text-decoration: none;
+    cursor: grab;
+    user-select: none;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+  }
+
+  .bm-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo-dot"></div>
+    <div class="logo-text">Catapult Analyzer</div>
+    <div class="version-badge">v3.0 AUTO</div>
+  </header>
+
+  <!-- WAITING STATE -->
+  <div id="waiting" class="card" style="display:block">
+    <span class="waiting-icon">⚡</span>
+    <div class="waiting-title">Готов к анализу</div>
+    <div class="waiting-sub">
+      Установи закладку ниже, затем открой любой токен на catapult.trade<br>
+      и нажми закладку — данные загрузятся автоматически
+    </div>
+
+    <!-- Bookmarklet install -->
+    <div class="bookmarklet-box">
+      <div class="bm-title">▸ ШАГ 1 — УСТАНОВИ ЗАКЛАДКУ</div>
+      <a class="bm-link" id="bookmarklet-link" href="#">⚡ Analyze on Catapult</a>
+      <div class="bm-hint">
+        Перетащи эту кнопку в панель закладок браузера (Bookmarks bar).<br>
+        Если панель не видна — нажми <strong style="color:var(--sub)">Ctrl+Shift+B</strong>
+      </div>
+    </div>
+
+    <div class="step-list">
+      <div class="step"><span class="step-num">01</span><span>Открой токен на catapult.trade который хочешь проанализировать</span></div>
+      <div class="step"><span class="step-num">02</span><span>Нажми закладку <strong style="color:var(--g)">⚡ Analyze on Catapult</strong> в панели браузера</span></div>
+      <div class="step"><span class="step-num">03</span><span>Эта страница автоматически получит все данные и запустит AI анализ</span></div>
+    </div>
+
+    <div style="margin-top:8px">
+      <div class="card-label" style="justify-content:center;margin-bottom:12px">или введи данные вручную</div>
+      <button class="btn-secondary" onclick="showManual()">Ввести вручную →</button>
+    </div>
+  </div>
+
+  <!-- MANUAL FORM -->
+  <div id="manual-form" class="card manual-form" style="display:none">
+    <div class="card-label">Ручной ввод данных</div>
+    <div class="grid2">
+      <div><div class="field-label">Название</div><input class="inp" id="m-name" placeholder="MOONUP"></div>
+      <div><div class="field-label">Тикер</div><input class="inp" id="m-symbol" placeholder="$MOONUP"></div>
+    </div>
+    <div class="grid3 mt">
+      <div><div class="field-label">Скорость</div>
+        <select class="inp" id="m-speed">
+          <option value="FLASH">flash ⚡</option>
+          <option value="FAST">fast 🔥</option>
+          <option value="CRACK">crack 💥</option>
+        </select>
+      </div>
+      <div><div class="field-label">Объём ($)</div><input class="inp" id="m-volume" placeholder="457"></div>
+      <div><div class="field-label">Buy / Sell</div><input class="inp" id="m-buysell" placeholder="4 / 1"></div>
+    </div>
+    <div class="grid2 mt">
+      <div><div class="field-label">Трейдеров</div><input class="inp" id="m-traders" placeholder="4"></div>
+      <div><div class="field-label">Создатель</div><input class="inp" id="m-creator" placeholder="lifufiza6"></div>
+    </div>
+    <div class="mt">
+      <div class="field-label">Рынок сейчас</div>
+      <select class="inp" id="m-sentiment">
+        <option value="neutral">Нейтральный ⚪</option>
+        <option value="bullish">Бычий 🟢</option>
+        <option value="bearish">Медвежий 🔴</option>
+      </select>
+    </div>
+    <div class="mt">
+      <div class="field-label">Наблюдения (график, чат)</div>
+      <textarea class="inp" id="m-notes" placeholder="График упал -31% с начала, сейчас небольшой отскок..."></textarea>
+    </div>
+    <div style="margin-top:16px">
+      <button class="btn-primary" onclick="analyzeManual()">⚡ Анализировать</button>
+    </div>
+  </div>
+
+  <!-- TOKEN DATA CARD -->
+  <div id="token-card" class="card slide" style="display:none">
+    <div class="card-label">Данные токена</div>
+    <div class="token-header">
+      <img class="token-avatar" id="t-avatar" src="" alt="" onerror="this.style.display='none'">
+      <div>
+        <div class="token-name" id="t-name">—</div>
+        <div class="token-meta" id="t-meta">—</div>
+      </div>
+      <div class="speed-badge" id="t-speed">—</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-label">Объём</div><div class="stat-value" id="t-vol">—</div></div>
+      <div class="stat-box"><div class="stat-label">Buy / Sell</div><div class="stat-value" id="t-bs">—</div></div>
+      <div class="stat-box"><div class="stat-label">Buy давление</div><div class="stat-value" id="t-bp">—</div></div>
+      <div class="stat-box"><div class="stat-label">Трейдеры</div><div class="stat-value" id="t-tr">—</div></div>
+    </div>
+    <div class="grid2" style="gap:10px;margin-bottom:14px">
+      <div class="stat-box"><div class="stat-label">Запущен</div><div class="stat-value" style="font-size:13px" id="t-age">—</div></div>
+      <div class="stat-box"><div class="stat-label">Создатель</div><div class="stat-value" style="font-size:13px" id="t-creator">—</div></div>
+    </div>
+    <div id="ta-summary-box" style="display:none;background:#0a0c0f;border:1px solid #1c1f25;border-left:2px solid #00ff8866;border-radius:8px;padding:14px 16px;margin-bottom:14px;"></div>
+
+    <div class="mt">
+      <div class="field-label">Паттерн графика прямо сейчас</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px">
+        <button type="button" class="pattern-btn" id="pat-rocket" onclick="selectPattern('rocket')" title="Резко вверх">🚀<span>резко вверх</span></button>
+        <button type="button" class="pattern-btn" id="pat-up" onclick="selectPattern('up')" title="Растёт">📈<span>растёт</span></button>
+        <button type="button" class="pattern-btn" id="pat-flat" onclick="selectPattern('flat')" title="Боковик">➡️<span>боковик</span></button>
+        <button type="button" class="pattern-btn" id="pat-down" onclick="selectPattern('down')" title="Падает">📉<span>падает</span></button>
+        <button type="button" class="pattern-btn" id="pat-crash" onclick="selectPattern('crash')" title="Резко вниз">💥<span>резко вниз</span></button>
+      </div>
+    </div>
+
+    <div class="grid2 mt">
+      <div>
+        <div class="field-label">Фаза токена</div>
+        <select class="inp" id="phase">
+          <option value="start">🟢 Только запустился (&lt;2 мин)</option>
+          <option value="early">🔵 Ранняя фаза (2-20%)</option>
+          <option value="mid">🟡 Середина (20-60%)</option>
+          <option value="late">🟠 Поздняя фаза (60-80%)</option>
+          <option value="end">🔴 Скоро конец (&gt;80%)</option>
+        </select>
+      </div>
+      <div>
+        <div class="field-label">Рынок сейчас</div>
+        <select class="inp" id="sentiment">
+          <option value="neutral">Нейтральный ⚪</option>
+          <option value="bullish">Бычий 🟢</option>
+          <option value="bearish">Медвежий 🔴</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="mt">
+      <div class="field-label">Momentum — цена сейчас относительно открытия</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px">
+        <button type="button" class="momentum-btn" id="mom-up" onclick="selectMomentum('up')">▲ Выше старта</button>
+        <button type="button" class="momentum-btn" id="mom-flat" onclick="selectMomentum('flat')">= На уровне</button>
+        <button type="button" class="momentum-btn" id="mom-down" onclick="selectMomentum('down')">▼ Ниже старта</button>
+      </div>
+    </div>
+
+    <div class="mt">
+      <div class="field-label">Дополнительные наблюдения</div>
+      <textarea class="inp" id="notes" placeholder="Необычная активность, резкий объём, паттерн свечей..."></textarea>
+    </div>
+    <div style="margin-top:16px">
+      <button class="btn-primary" id="analyze-btn" onclick="runAnalysis()">⚡ Запустить анализ</button>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loading" class="card" style="display:none">
+    <div class="loading-ring"></div>
+    <div class="loading-text" id="loading-text">ЗАГРУЖАЮ ДАННЫЕ...</div>
+    <div class="loading-sub" id="loading-sub">Подключаюсь к catapult.trade</div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="result-card" class="card slide" style="display:none">
+    <div class="card-label" id="result-label">Результат анализа</div>
+    <div class="verdict">
+      <div class="direction" id="result-dir">—</div>
+      <div class="conf-wrap">
+        <div class="conf-row">
+          <span>УВЕРЕННОСТЬ</span>
+          <span id="conf-pct">—</span>
+        </div>
+        <div class="conf-bar">
+          <div class="conf-fill" id="conf-fill" style="width:0%"></div>
+        </div>
+        <div class="conf-label" id="conf-label">—</div>
+      </div>
+    </div>
+
+    <div class="card-label">Ключевые сигналы</div>
+    <div class="signals" id="signals-list"></div>
+
+    <div class="card-label" style="margin-top:16px">Логика</div>
+    <div class="analysis-block" id="logic-text">—</div>
+
+    <div class="card-label">Риск</div>
+    <div class="risk-block" id="risk-text">—</div>
+
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="location.reload()">← Новый токен</button>
+      <button class="btn-primary" onclick="showTokenCard()">↩ Изменить</button>
+    </div>
+    <div class="disclaimer">
+      Не является финансовым советом. Catapult Turbo использует GBM — результат непредсказуем.<br>
+      Торгуй только тем, что готов потерять. DYOR.
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────
+let tokenData = null;
+let selectedPattern = null;
+let selectedMomentum = null;
+
+function selectPattern(p) {
+  selectedPattern = p;
+  ['rocket','up','flat','down','crash'].forEach(function(k) {
+    var b = document.getElementById('pat-'+k);
+    if (b) b.classList.toggle('active', k === p);
+  });
+}
+
+function selectMomentum(m) {
+  selectedMomentum = m;
+  ['up','flat','down'].forEach(function(k) {
+    var b = document.getElementById('mom-'+k);
+    if (b) b.classList.toggle('active', k === m);
+  });
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+function formatVol(drops) {
+  if (!drops) return '—';
+  const u = drops / 1e6;
+  return u >= 1000 ? '$' + (u/1000).toFixed(1) + 'K' : '$' + u.toFixed(0);
+}
+
+function formatAge(startDate) {
+  if (!startDate) return '—';
+  const m = Math.floor((Date.now() - new Date(startDate)) / 60000);
+  if (m < 1) return 'только что';
+  if (m < 60) return m + ' мин назад';
+  return Math.floor(m/60) + 'ч ' + (m%60) + 'мин назад';
+}
+
+function formatSpeed(s) {
+  return { FLASH:'flash ⚡', FAST:'fast 🔥', CRACK:'crack 💥' }[s?.toUpperCase()] || s || '—';
+}
+
+function show(id) { var e=document.getElementById(id); e.style.display='block'; e.classList.add('show'); }
+function hide(id) { var e=document.getElementById(id); e.style.display='none'; e.classList.remove('show'); }
+function el(id) { return document.getElementById(id); }
+
+
+
+// ─── Render token card ────────────────────────────────────────────────
+function renderTokenCard(t) {
+  hide('waiting');
+  hide('loading');
+  hide('manual-form');
+
+  const stats = t.statistics || {};
+  const buys = stats.buysCount || 0;
+  const sells = stats.sellsCount || 0;
+  const bp = buys + sells > 0 ? Math.round(buys/(buys+sells)*100) : null;
+
+  if (t.avatarUrl) el('t-avatar').src = t.avatarUrl;
+  el('t-name').textContent = t.name || '—';
+  el('t-meta').textContent = '$' + (t.symbol||'') + ' · #' + (t.id||'');
+  el('t-speed').textContent = formatSpeed(t.speedMode);
+  el('t-vol').textContent = formatVol(stats.totalVolumeUsdtDrops);
+  el('t-bs').textContent = buys + ' / ' + sells;
+  el('t-bp').textContent = bp !== null ? bp + '%' : '—';
+  el('t-bp').style.color = bp > 60 ? '#00ff88' : bp < 40 ? '#ff3366' : '#dde6f0';
+  el('t-tr').textContent = stats.uniqueTradersCount || '—';
+  el('t-age').textContent = formatAge(t.startDate);
+  el('t-creator').textContent = t.user?.profileName || '—';
+
+  // Show TA summary if chart available
+  var taBox = el('ta-summary-box');
+  if (t._chart && taBox) {
+    try {
+      var ta = analyzeChart(t._chart);
+      taBox.style.display = 'block';
+      var rsiColor = ta.rsi > 70 ? '#ff3366' : ta.rsi < 30 ? '#00ff88' : '#dde6f0';
+      taBox.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;letter-spacing:0.12em;color:#353d4a;margin-bottom:8px;text-transform:uppercase;">⚡ Технический анализ · ' + ta.tf + '</div>'
+        + '<div style="font-size:12px;line-height:1.9;color:#7a8898;white-space:pre-wrap">'
+        + ta.summary.replace(/RSI\(\d+\): (\d+)/g, function(m, v) {
+            var c = v > 70 ? '#ff3366' : v < 30 ? '#00ff88' : '#dde6f0';
+            return '<span style="color:' + c + ';font-weight:700">' + m + '</span>';
+          })
+        + '</div>';
+    } catch(e) {}
+  }
+
+  show('token-card');
+}
+
+// ─── Manual mode ─────────────────────────────────────────────────────
+function showManual() {
+  hide('waiting');
+  el('manual-form').classList.add('show');
+}
+
+function analyzeManual() {
+  const bs = (el('m-buysell').value || '0/0').split('/').map(x => parseInt(x.trim()) || 0);
+  tokenData = {
+    id: 'manual',
+    name: el('m-name').value || 'неизвестно',
+    symbol: el('m-symbol').value || '',
+    speedMode: el('m-speed').value,
+    startDate: null,
+    user: { profileName: el('m-creator').value || '—' },
+    statistics: {
+      totalVolumeUsdtDrops: parseFloat(el('m-volume').value || 0) * 1e6,
+      buysCount: bs[0] || 0,
+      sellsCount: bs[1] || 0,
+      uniqueTradersCount: parseInt(el('m-traders').value) || 0,
+    }
+  };
+  const sentiment = el('m-sentiment').value;
+  const notes = el('m-notes').value;
+  el('manual-form').classList.remove('show');
+  doAnalysis(tokenData, sentiment, notes);
+}
+
+// ─── Main analysis ────────────────────────────────────────────────────
+function runAnalysis() {
+  const sentiment = el('sentiment').value;
+  const notes = el('notes').value;
+  const phase = el('phase').value;
+  hide('token-card');
+  doAnalysis(tokenData, sentiment, notes, phase, selectedPattern, selectedMomentum);
+}
+
+function showTokenCard() {
+  hide('result-card');
+  show('token-card');
+}
+
+async function doAnalysis(t, sentiment, notes, phase, pattern, momentum) {
+  const stats = t.statistics || {};
+  const buys = stats.buysCount || 0;
+  const sells = stats.sellsCount || 0;
+  const bp = buys + sells > 0 ? Math.round(buys/(buys+sells)*100) : '?';
+
+  // Run TA if chart data available
+  var taResult = null;
+  if (t._chart) {
+    try { taResult = analyzeChart(t._chart); } catch(e) { console.error('TA error:', e); }
+  }
+
+  const patternMap = {
+    rocket:'РЕЗКО ВВЕРХ 🚀 — сильный восходящий импульс',
+    up:'РАСТЁТ 📈 — умеренный восходящий тренд',
+    flat:'БОКОВИК ➡️ — нет чёткого направления',
+    down:'ПАДАЕТ 📉 — умеренный нисходящий тренд',
+    crash:'РЕЗКО ВНИЗ 💥 — сильный нисходящий импульс',
+  };
+  const momentumMap = {
+    up:'ВЫШЕ старта — цена в плюсе от открытия',
+    flat:'НА УРОВНЕ старта — около цены открытия',
+    down:'НИЖЕ старта — цена в минусе от открытия',
+  };
+  const phaseMap = {
+    start:'СТАРТ — токен только запустился (< 2 мин)',
+    early:'РАННЯЯ ФАЗА — пройдено 2-20% времени',
+    mid:'СЕРЕДИНА — пройдено 20-60% времени',
+    late:'ПОЗДНЯЯ ФАЗА — пройдено 60-80% времени',
+    end:'ФИНАЛ — пройдено >80% времени',
+  };
+
+  let timeProgress = '?';
+  if (t.startDate && t.endDate) {
+    const total = new Date(t.endDate) - new Date(t.startDate);
+    const elapsed = Date.now() - new Date(t.startDate);
+    timeProgress = Math.min(100, Math.round(elapsed / total * 100)) + '%';
+  }
+
+  el('loading').style.display = 'flex';
+  el('loading-text').textContent = 'AI АНАЛИЗИРУЕТ ' + (t.name || 'токен') + '...';
+  el('loading-sub').textContent = taResult ? 'Провожу технический анализ...' : 'Обрабатываю данные...';
+
+  const prompt = `Ты профессиональный трейдер и технический аналитик на catapult.trade (Catapult Turbo).
+Платформа генерирует синтетические токены с ценовым путём через GBM (Geometric Brownian Motion).
+Путь зафиксирован криптографически ДО начала торгов.
+
+=== ДАННЫЕ ТОКЕНА ===
+Название: ${t.name} ($${t.symbol}) · ID: ${t.id}
+Скорость: ${formatSpeed(t.speedMode)}
+Начальная цена: $${t.initialPrice || '?'}
+Создатель: ${t.user?.profileName || 'неизвестен'}
+Прогресс времени: ${timeProgress}
+Запущен: ${formatAge(t.startDate)}
+Фаза: ${phaseMap[phase || 'mid']}
+
+=== СТАТИСТИКА ТОРГОВ ===
+Объём: ${formatVol(stats.totalVolumeUsdtDrops)}
+Покупок / Продаж: ${buys} / ${sells}
+Buy давление: ${bp}%
+Уникальных трейдеров: ${stats.uniqueTradersCount || 0}
+
+${taResult ? `=== ТЕХНИЧЕСКИЙ АНАЛИЗ ГРАФИКА (вес 50% — ГЛАВНЫЙ СИГНАЛ) ===
+${taResult.summary}` : '=== ТЕХНИЧЕСКИЙ АНАЛИЗ ГРАФИКА ===\nДанные графика недоступны — используй визуальные сигналы трейдера'}
+
+=== ВИЗУАЛЬНЫЕ СИГНАЛЫ ТРЕЙДЕРА ===
+Паттерн графика: ${pattern ? patternMap[pattern] : 'не указан'}
+Momentum (цена vs открытие): ${momentum ? momentumMap[momentum] : 'не указан'}
+Наблюдения: ${notes || 'нет'}
+
+=== РЫНОЧНЫЙ КОНТЕКСТ ===
+Общий рынок: ${sentiment}
+
+=== ПРАВИЛА АНАЛИЗА ===
+Веса при наличии данных графика:
+1. Технический анализ (RSI, EMA, тренд, momentum) = 50%
+2. Buy/Sell давление = 20%
+3. Фаза токена = 15%
+4. Скорость GBM + рынок = 15%
+
+Правила по RSI:
+- RSI > 70: перекуплен → SHORT сигнал
+- RSI < 30: перепродан → LONG сигнал
+- RSI 30-70: нейтрально → смотри EMA и тренд
+
+Правила по EMA:
+- Цена > EMA9 > EMA21: сильный LONG
+- Цена < EMA9 < EMA21: сильный SHORT
+- EMA9 пересекает EMA21 снизу вверх: LONG
+- EMA9 пересекает EMA21 сверху вниз: SHORT
+
+Правила по серии свечей:
+- 4+ бычьих свечей подряд: возможен откат (SHORT)
+- 4+ медвежьих свечей подряд: возможен отскок (LONG)
+
+Правила по скорости GBM:
+- FLASH: экстремальная волатильность, следуй тренду агрессивно
+- FAST: умеренная, стандартный TA работает хорошо
+- CRACK: медленная, RSI/EMA наиболее надёжны
+
+=== ЗАДАЧА ===
+Дай рекомендацию СТРОГО в формате:
+
+РЕКОМЕНДАЦИЯ: [LONG или SHORT]
+УВЕРЕННОСТЬ: [50-92]%
+
+СИГНАЛЫ:
+• [сигнал 1 — технический индикатор]
+• [сигнал 2 — технический индикатор]
+• [сигнал 3 — статистика торгов]
+• [сигнал 4 — фаза/контекст]
+
+ЛОГИКА: [2-3 предложения — конкретно через RSI, EMA, тренд]
+
+РИСК: [1-2 предложения]
+
+Отвечай на русском языке.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.map(b => b.text || '').join('') || 'Ошибка';
+    el('loading').style.display = 'none';
+    renderResult(text, t);
+  } catch(e) {
+    el('loading').style.display = 'none';
+    alert('Ошибка AI: ' + e.message);
+  }
+}
+
+// ─── Render result ────────────────────────────────────────────────────
+function renderResult(text, t) {
+  const dir = /РЕКОМЕНДАЦИЯ:\s*(LONG|SHORT)/i.exec(text)?.[1]?.toUpperCase()
+    || (/LONG/i.test(text) ? 'LONG' : 'SHORT');
+  const conf = parseInt(/УВЕРЕННОСТЬ:\s*(\d+)/i.exec(text)?.[1] || '65');
+  const sigMatch = text.match(/СИГНАЛЫ:([\s\S]*?)(?:ЛОГИКА:|РИСК:|$)/i);
+  const signals = sigMatch
+    ? sigMatch[1].split('\n').map(l => l.replace(/^[•\-*]\s*/,'').trim()).filter(l => l.length > 5).slice(0,4)
+    : [];
+  const logic = /ЛОГИКА:([\s\S]*?)(?:РИСК:|$)/i.exec(text)?.[1]?.trim() || '';
+  const risk = /РИСК:([\s\S]*?)$/i.exec(text)?.[1]?.trim() || '';
+
+  const isLong = dir === 'LONG';
+  const color = isLong ? '#00ff88' : '#ff3366';
+
+  el('result-label').textContent = 'Результат · ' + (t.name||'') + ' $' + (t.symbol||'');
+  el('result-card').style.borderColor = color + '44';
+  el('result-card').style.background = isLong ? 'rgba(0,255,136,0.04)' : 'rgba(255,51,102,0.04)';
+
+  el('result-dir').textContent = (isLong ? '▲ ' : '▼ ') + dir;
+  el('result-dir').style.color = color;
+
+  el('conf-pct').textContent = conf + '%';
+  el('conf-pct').style.color = color;
+  el('conf-fill').style.background = color;
+  setTimeout(() => { el('conf-fill').style.width = conf + '%'; }, 50);
+  el('conf-label').textContent = conf >= 80 ? 'Сильный сигнал' : conf >= 65 ? 'Умеренный сигнал' : 'Слабый сигнал — осторожно';
+
+  const sl = el('signals-list');
+  sl.innerHTML = '';
+  signals.forEach(s => {
+    sl.innerHTML += `<div class="signal-item">
+      <div class="signal-dot" style="background:${color}"></div>
+      <span>${s}</span>
+    </div>`;
+  });
+
+  el('logic-text').textContent = logic || '—';
+  el('logic-text').style.borderLeft = '2px solid ' + color + '44';
+  el('risk-text').textContent = '⚠ ' + (risk || '—');
+
+  show('result-card');
+}
+
+// ─── Technical Analysis Engine ────────────────────────────────────────
+function calcEMA(prices, period) {
+  if (prices.length < period) return null;
+  var k = 2 / (period + 1);
+  var ema = prices.slice(0, period).reduce(function(a,b){return a+b;},0) / period;
+  for (var i = period; i < prices.length; i++) {
+    ema = prices[i] * k + ema * (1 - k);
+  }
+  return ema;
+}
+
+function calcRSI(prices, period) {
+  if (prices.length < period + 1) return null;
+  var gains = 0, losses = 0;
+  for (var i = prices.length - period; i < prices.length; i++) {
+    var diff = prices[i] - prices[i-1];
+    if (diff > 0) gains += diff; else losses -= diff;
+  }
+  if (losses === 0) return 100;
+  var rs = (gains / period) / (losses / period);
+  return Math.round(100 - 100 / (1 + rs));
+}
+
+function calcATR(candles, period) {
+  if (candles.length < 2) return null;
+  var trs = [];
+  for (var i = 1; i < candles.length; i++) {
+    var c = candles[i], p = candles[i-1];
+    trs.push(Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close)));
+  }
+  var slice = trs.slice(-period);
+  return slice.reduce(function(a,b){return a+b;},0) / slice.length;
+}
+
+function analyzeChart(chartData) {
+  // Use m1 if available and enough candles, else fall back to s30, s15
+  var candles = [];
+  var tf = 'none';
+  if (chartData.m1 && chartData.m1.length >= 3) { candles = chartData.m1; tf = '1m'; }
+  else if (chartData.s30 && chartData.s30.length >= 3) { candles = chartData.s30; tf = '30s'; }
+  else if (chartData.s15 && chartData.s15.length >= 3) { candles = chartData.s15; tf = '15s'; }
+  else if (chartData.s5 && chartData.s5.length >= 3) { candles = chartData.s5; tf = '5s'; }
+  else if (chartData.total && chartData.total.length >= 1) { candles = chartData.total; tf = 'total'; }
+
+  if (candles.length === 0) return { tf:'none', summary:'Данных графика нет' };
+
+  var closes = candles.map(function(c){return parseFloat(c.close);});
+  var highs = candles.map(function(c){return parseFloat(c.high);});
+  var lows = candles.map(function(c){return parseFloat(c.low);});
+
+  var first = closes[0];
+  var last = closes[closes.length - 1];
+  var currentPrice = parseFloat(chartData.currentPrice) || last;
+  var totalChange = first > 0 ? ((last - first) / first * 100).toFixed(1) : '?';
+
+  // EMAs
+  var ema9 = calcEMA(closes, Math.min(9, closes.length));
+  var ema21 = calcEMA(closes, Math.min(21, closes.length));
+
+  // RSI
+  var rsi = calcRSI(closes, Math.min(14, closes.length - 1));
+
+  // ATR (volatility)
+  var atr = calcATR(candles, Math.min(10, candles.length - 1));
+  var atrPct = atr && last > 0 ? (atr / last * 100).toFixed(1) : null;
+
+  // Trend: last 3 candles direction
+  var recentCandles = candles.slice(-5);
+  var upCount = 0, downCount = 0;
+  recentCandles.forEach(function(c){ if (parseFloat(c.close) >= parseFloat(c.open)) upCount++; else downCount++; });
+  var recentTrend = upCount > downCount ? 'восходящий' : downCount > upCount ? 'нисходящий' : 'нейтральный';
+
+  // Support / Resistance (simple: min/max of all candles)
+  var support = Math.min.apply(null, lows).toFixed(4);
+  var resistance = Math.max.apply(null, highs).toFixed(4);
+
+  // Last candle body
+  var lastC = candles[candles.length - 1];
+  var lastBody = Math.abs(parseFloat(lastC.close) - parseFloat(lastC.open));
+  var lastRange = parseFloat(lastC.high) - parseFloat(lastC.low);
+  var lastBodyPct = lastRange > 0 ? (lastBody / lastRange * 100).toFixed(0) : '?';
+  var lastDir = parseFloat(lastC.close) >= parseFloat(lastC.open) ? 'бычья' : 'медвежья';
+
+  // Consecutive candles in one direction
+  var streak = 1;
+  for (var i = candles.length - 2; i >= 0; i--) {
+    var cur = parseFloat(candles[i+1].close) - parseFloat(candles[i+1].open);
+    var prev = parseFloat(candles[i].close) - parseFloat(candles[i].open);
+    if ((cur >= 0) === (prev >= 0)) streak++; else break;
+  }
+
+  // Price momentum: last 3 vs previous 3
+  var momentumStr = '?';
+  if (closes.length >= 6) {
+    var recent3avg = (closes[closes.length-1]+closes[closes.length-2]+closes[closes.length-3])/3;
+    var prev3avg = (closes[closes.length-4]+closes[closes.length-5]+closes[closes.length-6])/3;
+    var momPct = ((recent3avg - prev3avg) / prev3avg * 100).toFixed(1);
+    momentumStr = momPct > 0 ? '+' + momPct + '% (растущий)' : momPct + '% (падающий)';
+  }
+
+  var summary = [
+    'Таймфрейм анализа: ' + tf + ' (' + candles.length + ' свечей)',
+    'Текущая цена: ' + currentPrice,
+    'Изменение с начала: ' + totalChange + '%',
+    'Тренд последних 5 свечей: ' + recentTrend + ' (' + upCount + ' бычьих / ' + downCount + ' медвежьих)',
+    'Серия подряд: ' + streak + ' свечей ' + (parseFloat(lastC.close) >= parseFloat(lastC.open) ? 'вверх' : 'вниз'),
+    'Последняя свеча: ' + lastDir + ', тело ' + lastBodyPct + '% от диапазона',
+    'Momentum (3 vs пред. 3): ' + momentumStr,
+    ema9 ? 'EMA9: ' + ema9.toFixed(4) + (last > ema9 ? ' (цена ВЫШЕ — бычий сигнал)' : ' (цена НИЖЕ — медвежий сигнал)') : '',
+    ema21 ? 'EMA21: ' + ema21.toFixed(4) + (ema9 && ema9 > ema21 ? ' (EMA9 > EMA21 — бычий крест)' : ema9 && ema9 < ema21 ? ' (EMA9 < EMA21 — медвежий крест)' : '') : '',
+    rsi !== null ? 'RSI(' + Math.min(14, closes.length-1) + '): ' + rsi + (rsi > 70 ? ' — перекуплен, возможен разворот вниз' : rsi < 30 ? ' — перепродан, возможен разворот вверх' : ' — нейтральная зона') : '',
+    atrPct ? 'Волатильность ATR: ' + atrPct + '% от цены' : '',
+    'Поддержка: ' + support + ' · Сопротивление: ' + resistance,
+  ].filter(Boolean).join('\n');
+
+  return { tf, summary, rsi, ema9, ema21, last, totalChange, recentTrend, streak, momentumStr };
+}
+
+// ─── Build bookmarklet (URL params — единственный кросс-доменный способ) ─
+(function() {
+  const analyzerUrl = window.location.href.split('?')[0];
+
+  const bookmarkletCode = `(function(){
+    var tid=location.pathname.match(/\\/tokens\\/(\\d+)/);
+    if(!tid){alert('Открой страницу токена на catapult.trade');return;}
+    var gql=function(q,v){return fetch('/graphql',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,variables:v||{}})}).then(function(r){return r.json();});};
+    var q1='query TurboTokenDetailsV2($tokenId:String!){turboTokenDetailsV2(tokenId:$tokenId){avatarUrl description endDate id initialPrice isExpired name rank speedMode startDate statistics{buysCount sellsCount totalVolumeUsdtDrops uniqueTradersCount}symbol user{profileName}}}';
+    var q2='query TurboTokenChartData($tokenId:String!){turboTokenChartData(tokenId:$tokenId){currentPrice s5{close high low open time}s15{close high low open time}s30{close high low open time}m1{close high low open time}m3{close high low open time}m5{close high low open time}total{close high low open time}}}';
+    Promise.all([gql(q1,{tokenId:tid[1]}),gql(q2,{tokenId:tid[1]})])
+    .then(function(results){
+      var t=results[0]&&results[0].data&&results[0].data.turboTokenDetailsV2;
+      var chart=results[1]&&results[1].data&&results[1].data.turboTokenChartData;
+      if(!t){alert('Не удалось получить данные токена');return;}
+      var payload={token:t,chart:chart||null};
+      var encoded=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      window.open('ANALYZER_URL?d='+encoded,'_blank');
+    })
+    .catch(function(e){alert('Ошибка: '+e.message);});
+  })();`.replace('ANALYZER_URL', analyzerUrl);
+
+  const encoded = 'javascript:' + encodeURIComponent(bookmarkletCode);
+  document.getElementById('bookmarklet-link').href = encoded;
+})();
+
+// ─── Read data from URL params ────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', function() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var d = params.get('d');
+    if (d) {
+      var payload = JSON.parse(decodeURIComponent(escape(atob(d))));
+      // Support both old format (just token) and new format (token + chart)
+      var t = payload.token || payload;
+      var chart = payload.chart || null;
+      tokenData = t;
+      if (chart) tokenData._chart = chart;
+      setTimeout(function() { renderTokenCard(t); }, 200);
+    }
+  } catch(e) {
+    console.error('Failed to parse token data:', e);
+  }
+});
+</script>
+</body>
+</html>
